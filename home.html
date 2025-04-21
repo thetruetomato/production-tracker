@@ -117,7 +117,7 @@
       <h2>Pulping</h2>
       <div id="pulpContainer">
         <div class="crate-entry">
-          <label>Container Weight (kg): <input type="number" name="pulp_weight[]" required></label>
+          <label>Container Weight (kg): <input type="number" name="pulp_weight[]" required onchange="updateTotalPulpWeight()"></label>
           <button type="button" class="remove-crate-btn" onclick="removePulpContainer(this)">Remove</button>
         </div>
       </div>
@@ -275,11 +275,11 @@
       `;
       
       const defaultPulpHtml = `
-        <div class="crate-entry">
-          <label>Container Weight (kg): <input type="number" name="pulp_weight[]" required></label>
-          <button type="button" class="remove-crate-btn" onclick="removePulpContainer(this)">Remove</button>
-        </div>
-      `;
+  <div class="crate-entry">
+    <label>Container Weight (kg): <input type="number" name="pulp_weight[]" required onchange="updateTotalPulpWeight()"></label>
+    <button type="button" class="remove-crate-btn" onclick="removePulpContainer(this)">Remove</button>
+  </div>
+`;
       
       const defaultBottlingHtml = `
         <div class="crate-entry">
