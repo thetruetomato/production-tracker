@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Ketchup Production Tracker</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4; }
+    .step { display: none; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    .step.active { display: block; }
+    .nav-buttons { margin-top: 20px; display: flex; justify-content: space-between; }
+    input, select { margin-bottom: 10px; width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+    h2 { margin-top: 20px; }
+    .progress-bar { height: 10px; background: #ddd; margin-bottom: 20px; border-radius: 5px; overflow: hidden; }
+    .progress { height: 100%; background: #4caf50; width: 0%; transition: width 0.3s; }
+    .timestamp { font-size: 12px; color: #555; margin-top: 5px; }
+    .error { color: red; font-size: 14px; display: none; }
+    .crate-entry { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+    .add-crate-btn { background: #4caf50; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; margin-top: 10px; }
+    .remove-crate-btn { background: #f44336; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px; }
+    .total-weight { font-weight: bold; margin-top: 15px; }
+    .summary { background: #e8f5e9; padding: 10px; border-radius: 4px; margin: 10px 0; }
+    .batch-info { 
+      background: #fff3e0; 
+      padding: 10px; 
+      border-radius: 4px; 
+      margin-bottom: 10px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    .batch-info label {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .batch-info input {
+      width: 200px;
+      margin: 0;
+    }
+    .new-batch-btn { 
+      background: #2196f3; 
+      color: white; 
+      padding: 8px 15px; 
+      border: none; 
+      border-radius: 4px; 
+      cursor: pointer;
+      font-size: 14px;
+      height: fit-content;
+      align-self: flex-end;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ketchup Production Tracker</h1>
+
+  <div class="batch-info">
+    <label>
+      Batch Number:
+      <input type="text" id="batchNumber" required>
+    </label>
+    <label>
+      Production Date:
+      <input type="date" id="productionDate" required placeholder="dd-mm-yyyy">
+    </label>
+    <label>
+      Supervisor Name:
+      <input type="text" id="supervisorName" required>
+    </label>
+    <button class="new-batch-btn" id="startBatchBtn" onclick="startNewBatch()">Start New Batch</button>
+  </div>
+
+  <div class="progress-bar"><div class="progress" id="progress"></div></div>
+  <form id="trackerForm">
+    <!-- Rest of the form content remains the same -->
+    <!-- Step 1: Raw Material Intake -->
+    <div class="step active">
+      <h2>Raw Material Intake</h2>
+      <div id="crateContainer">
+        <div class="crate-entry">
+          <label>Crate Weight (kg): <input type="number" name="crate_weight[]" required></label>
+          <label>Defective Weight (kg): <input type="number" name="defective_weight[]"></label>
+          <button type="button" class="remove-crate-btn" onclick="removeCrate(this)">Remove</button>
+        </div>
+      </div>
+      <button type="button" class="add-crate-btn" onclick="addCrate()">Add Crate</button>
+      <div class="timestamp" id="timestamp0"></div>
+      <div class="error" id="error0">Please fill all required fields.</div>
+    </div>
+
+    <!-- Step 2: Washing -->
+    <div class="step">
+      <h2>Washing</h2>
+      <label>Weight of removed rotten tomatoes: <input type="number" name="wash_weight" required></label>
+      <div class="timestamp" id="timestamp1"></div>
+      <div class="error" id="error1">Please fill all required fields.</div>
+    </div>
+
+    <!-- Step 3: Blanching -->
+    <div class="step">
+      <h2>Puree processing</h2>
+      <label>Puree Method:
+        <select name="puree_method" required>
+          <option value="">Select method</option>
+          <option value="puree_machine">Puree Machine</option>
+          <option value="grinder">Grinder</option>
+        </select>
+      </label>
+      <label>puree waste (kg): <input type="number" name="blanch_weight" required></label>
+      <div class="timestamp" id="timestamp2"></div>
+      <div class="error" id="error2">Please fill all required fields.</div>
+    </div>
+
+    <!-- Step 4: Pulping -->
+    <div class="step">
+      <h2>Pulping</h2>
+      <div id="pulpContainer">
+        <div class="crate-entry">
+          <label>Container Weight (kg): <input type="number" name="pulp_weight[]" required></label>
+          <button type="button" class="remove-crate-btn" onclick="removePulpContainer(this)">Remove</button>
+        </div>
+      </div>
+      <button type="button" class="add-crate-btn" onclick="addPulpContainer()">Add Container</button>
+      <div class="total-weight" id="totalPulpWeight">Total Weight: 0 kg</div>
+      <div class="timestamp" id="timestamp3"></div>
+      <div class="error" id="error3">Please fill all required fields.</div>
+    </div>
+
+    <!-- Step 5: Cooking -->
+    <div class="step">
+      <h2>Cooking</h2>
+      <label>Input Puree (kg): <input type="number" name="input_puree" id="input_puree" required readonly></label>
+      <label>Pre-processing Brix: <input type="number" name="pre_brix" required></label>
+      <label>Pre-processing pH: <input type="number" name="pre_ph" required></label>
+      <label>Reduction Percentage (%): <input type="number" name="reduction_percent" id="reduction_percent" value="40" onchange="calculateFinalOutput()"></label>
+      <label>Sugar Added (g): <input type="number" name="sugar" id="sugar" readonly></label>
+      <label>Adrak Added (g): <input type="number" name="adrak" id="adrak" readonly></label>
+      <label>Vinegar Added (ml): <input type="number" name="vinegar" id="vinegar" readonly></label>
+      <label>Spices Added (g): <input type="number" name="spices"></label>
+      <label>Final Output (kg): <input type="number" name="final_output" id="final_output" required readonly></label>
+      <div class="timestamp" id="timestamp4"></div>
+      <div class="error" id="error4">Please fill all required fields.</div>
+    </div>
+
+    <!-- Step 6: Quality Control -->
+    <div class="step">
+      <h2>Quality Control</h2>
+      <label>pH Level -final: <input type="text" name="ph" required></label>
+      <label>Brix Level- final: <input type="text" name="brix" required></label>
+      <div class="timestamp" id="timestamp5"></div>
+      <div class="error" id="error5">Please fill all required fields.</div>
+    </div>
+
+    <!-- Step 7: Bottling -->
+    <div class="step">
+      <h2>Bottling & Packaging</h2>
+      <div id="bottlingContainer">
+        <div class="crate-entry">
+          <h3>Crate #1</h3>
+          <label>200g Bottles in Crate: <input type="number" name="bottles_200g[]" onchange="updatePackagingSummary()" required></label>
+          <label>500g Bottles in Crate: <input type="number" name="bottles_500g[]" onchange="updatePackagingSummary()" required></label>
+          <label>Defective Bottles: <input type="number" name="defective_bottles[]" onchange="updatePackagingSummary()"></label>
+          <button type="button" class="remove-crate-btn" onclick="removeBottlingCrate(this)">Remove Crate</button>
+        </div>
+      </div>
+      <button type="button" class="add-crate-btn" onclick="addBottlingCrate()">Add Crate</button>
+      
+      <div class="summary">
+        <div id="totalPackedWeight">Total Packed Weight: 0 kg</div>
+        <div id="remainingKetchup">Remaining Ketchup in Kettle: 0 kg</div>
+        <div id="totalBottles200">Total 200g Bottles: 0</div>
+        <div id="totalBottles500">Total 500g Bottles: 0</div>
+        <div id="totalDefective">Total Defective Bottles: 0</div>
+      </div>
+      
+      <div class="timestamp" id="timestamp6"></div>
+      <div class="error" id="error6">Please fill all required fields.</div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="nav-buttons">
+      <button type="button" onclick="prevStep()">Previous</button>
+      <button type="button" onclick="nextStep()">Next</button>
+      <button type="submit" style="display:none;">Submit</button>
+    </div>
+  </form>
+
+  <script>
+    const steps = document.querySelectorAll(".step");
+    const progress = document.getElementById("progress");
+    let currentStep = 0;
+    const timestamps = [];
+    let currentBatchNumber = '';
+
+    // Load saved data on page load
+    window.onload = function() {
+      const savedStep = localStorage.getItem('currentStep');
+      if (savedStep) {
+        currentStep = parseInt(savedStep);
+        showStep(currentStep);
+      }
+
+      const savedCrateContainer = localStorage.getItem('crateContainer');
+      if (savedCrateContainer) {
+        document.getElementById('crateContainer').innerHTML = savedCrateContainer;
+      }
+
+      const savedPulpContainer = localStorage.getItem('pulpContainer');
+      if (savedPulpContainer) {
+        document.getElementById('pulpContainer').innerHTML = savedPulpContainer;
+      }
+
+      const savedBottlingContainer = localStorage.getItem('bottlingContainer');
+      if (savedBottlingContainer) {
+        document.getElementById('bottlingContainer').innerHTML = savedBottlingContainer;
+      }
+
+      const savedFormData = localStorage.getItem('formData');
+      if (savedFormData) {
+        const formData = JSON.parse(savedFormData);
+        Object.keys(formData).forEach(key => {
+          const elements = document.getElementsByName(key);
+          elements.forEach(element => {
+            element.value = formData[key];
+          });
+        });
+      }
+    };
+
+    function startNewBatch() {
+      const batchNumber = document.getElementById('batchNumber').value;
+      const productionDate = document.getElementById('productionDate').value;
+      const supervisorName = document.getElementById('supervisorName').value;
+
+      if (!batchNumber || !productionDate || !supervisorName) {
+        alert('Please fill in all batch information fields');
+        return;
+      }
+
+      currentBatchNumber = batchNumber;
+      
+      // Store batch info
+      localStorage.setItem('batchInfo', JSON.stringify({
+        batchNumber,
+        productionDate,
+        supervisorName
+      }));
+
+      document.getElementById('startBatchBtn').style.display = 'none';
+      document.getElementById('batchNumber').disabled = true;
+      document.getElementById('productionDate').disabled = true;
+      document.getElementById('supervisorName').disabled = true;
+      
+      document.getElementById('trackerForm').reset();
+      timestamps.length = 0;
+      document.querySelectorAll('.timestamp').forEach(ts => ts.innerText = '');
+      currentStep = 0;
+      showStep(0);
+      
+      document.getElementById('totalPulpWeight').innerText = 'Total Weight: 0 kg';
+      document.getElementById('input_puree').value = '';
+      document.getElementById('final_output').value = '';
+      updatePackagingSummary();
+
+      // Clear localStorage
+      localStorage.clear();
+      
+      const defaultCrateHtml = `
+        <div class="crate-entry">
+          <label>Crate Weight (kg): <input type="number" name="crate_weight[]" required></label>
+          <label>Defective Weight (kg): <input type="number" name="defective_weight[]"></label>
+          <button type="button" class="remove-crate-btn" onclick="removeCrate(this)">Remove</button>
+        </div>
+      `;
+      
+      const defaultPulpHtml = `
+        <div class="crate-entry">
+          <label>Container Weight (kg): <input type="number" name="pulp_weight[]" required></label>
+          <button type="button" class="remove-crate-btn" onclick="removePulpContainer(this)">Remove</button>
+        </div>
+      `;
+      
+      const defaultBottlingHtml = `
+        <div class="crate-entry">
+          <h3>Crate #1</h3>
+          <label>200g Bottles in Crate: <input type="number" name="bottles_200g[]" onchange="updatePackagingSummary()" required></label>
+          <label>500g Bottles in Crate: <input type="number" name="bottles_500g[]" onchange="updatePackagingSummary()" required></label>
+          <label>Defective Bottles: <input type="number" name="defective_bottles[]" onchange="updatePackagingSummary()"></label>
+          <button type="button" class="remove-crate-btn" onclick="removeBottlingCrate(this)">Remove Crate</button>
+        </div>
+      `;
+
+      document.getElementById('crateContainer').innerHTML = defaultCrateHtml;
+      document.getElementById('pulpContainer').innerHTML = defaultPulpHtml;
+      document.getElementById('bottlingContainer').innerHTML = defaultBottlingHtml;
+
+      // Store default containers
+      localStorage.setItem('crateContainer', defaultCrateHtml);
+      localStorage.setItem('pulpContainer', defaultPulpHtml);
+      localStorage.setItem('bottlingContainer', defaultBottlingHtml);
+
+      alert(`Starting new batch ${batchNumber}`);
+    }
+
+    function addCrate() {
+      const container = document.getElementById("crateContainer");
+      const crateEntry = document.createElement("div");
+      crateEntry.className = "crate-entry";
+      crateEntry.innerHTML = `
+        <label>Crate Weight (kg): <input type="number" name="crate_weight[]" required></label>
+        <label>Defective Weight (kg): <input type="number" name="defective_weight[]"></label>
+        <button type="button" class="remove-crate-btn" onclick="removeCrate(this)">Remove</button>
+      `;
+      container.appendChild(crateEntry);
+      localStorage.setItem('crateContainer', container.innerHTML);
+    }
+
+    function addPulpContainer() {
+      const container = document.getElementById("pulpContainer");
+      const pulpEntry = document.createElement("div");
+      pulpEntry.className = "crate-entry";
+      pulpEntry.innerHTML = `
+        <label>Container Weight (kg): <input type="number" name="pulp_weight[]" required onchange="updateTotalPulpWeight()"></label>
+        <button type="button" class="remove-crate-btn" onclick="removePulpContainer(this)">Remove</button>
+      `;
+      container.appendChild(pulpEntry);
+      localStorage.setItem('pulpContainer', container.innerHTML);
+    }
+
+    function addBottlingCrate() {
+      const container = document.getElementById("bottlingContainer");
+      const crateCount = container.children.length + 1;
+      const crateEntry = document.createElement("div");
+      crateEntry.className = "crate-entry";
+      crateEntry.innerHTML = `
+        <h3>Crate #${crateCount}</h3>
+        <label>200g Bottles in Crate: <input type="number" name="bottles_200g[]" onchange="updatePackagingSummary()" required></label>
+        <label>500g Bottles in Crate: <input type="number" name="bottles_500g[]" onchange="updatePackagingSummary()" required></label>
+        <label>Defective Bottles: <input type="number" name="defective_bottles[]" onchange="updatePackagingSummary()"></label>
+        <button type="button" class="remove-crate-btn" onclick="removeBottlingCrate(this)">Remove Crate</button>
+      `;
+      container.appendChild(crateEntry);
+      localStorage.setItem('bottlingContainer', container.innerHTML);
+    }
+
+    function updatePackagingSummary() {
+      const bottles200g = Array.from(document.getElementsByName('bottles_200g[]'))
+        .map(input => parseInt(input.value) || 0);
+      const bottles500g = Array.from(document.getElementsByName('bottles_500g[]'))
+        .map(input => parseInt(input.value) || 0);
+      const defectiveBottles = Array.from(document.getElementsByName('defective_bottles[]'))
+        .map(input => parseInt(input.value) || 0);
+
+      const total200g = bottles200g.reduce((sum, count) => sum + count, 0);
+      const total500g = bottles500g.reduce((sum, count) => sum + count, 0);
+      const totalDefective = defectiveBottles.reduce((sum, count) => sum + count, 0);
+
+      const packedWeight = (total200g * 0.2 + total500g * 0.5);
+      const finalOutput = parseFloat(document.getElementById('final_output').value) || 0;
+      const remainingKetchup = finalOutput - packedWeight;
+
+      document.getElementById('totalPackedWeight').innerText = `Total Packed Weight: ${packedWeight.toFixed(2)} kg`;
+      document.getElementById('remainingKetchup').innerText = `Remaining Ketchup in Kettle: ${remainingKetchup.toFixed(2)} kg`;
+      document.getElementById('totalBottles200').innerText = `Total 200g Bottles: ${total200g}`;
+      document.getElementById('totalBottles500').innerText = `Total 500g Bottles: ${total500g}`;
+      document.getElementById('totalDefective').innerText = `Total Defective Bottles: ${totalDefective}`;
+
+      // Store summary data
+      localStorage.setItem('packagingSummary', JSON.stringify({
+        packedWeight,
+        remainingKetchup,
+        total200g,
+        total500g,
+        totalDefective
+      }));
+    }
+
+    function removeBottlingCrate(button) {
+      const container = document.getElementById("bottlingContainer");
+      if (container.children.length > 1) {
+        button.parentElement.remove();
+        updatePackagingSummary();
+        localStorage.setItem('bottlingContainer', container.innerHTML);
+      }
+    }
+
+    function updateTotalPulpWeight() {
+      const weights = Array.from(document.getElementsByName('pulp_weight[]'))
+        .map(input => parseFloat(input.value) || 0);
+      const total = weights.reduce((sum, weight) => sum + weight, 0);
+      document.getElementById('totalPulpWeight').innerText = `Total Weight: ${total.toFixed(2)} kg`;
+      document.getElementById('input_puree').value = total.toFixed(2);
+      calculateFinalOutput();
+      localStorage.setItem('totalPulpWeight', total);
+    }
+
+    function calculateFinalOutput() {
+      const inputPuree = parseFloat(document.getElementById('input_puree').value) || 0;
+      const reductionPercent = parseFloat(document.getElementById('reduction_percent').value) || 40;
+      const finalOutput = inputPuree * (1 - reductionPercent/100);
+      document.getElementById('final_output').value = finalOutput.toFixed(2);
+      document.getElementById('sugar').value = ((finalOutput * 150)/1000).toFixed(2);
+      document.getElementById('adrak').value = (finalOutput * 0.8).toFixed(2);
+      document.getElementById('vinegar').value = (finalOutput * 8).toFixed(2);
+      updatePackagingSummary();
+
+      // Store calculations
+      localStorage.setItem('calculations', JSON.stringify({
+        inputPuree,
+        reductionPercent,
+        finalOutput,
+        sugar: document.getElementById('sugar').value,
+        adrak: document.getElementById('adrak').value,
+        vinegar: document.getElementById('vinegar').value
+      }));
+    }
+
+    function removeCrate(button) {
+      const container = document.getElementById("crateContainer");
+      if (container.children.length > 1) {
+        button.parentElement.remove();
+        localStorage.setItem('crateContainer', container.innerHTML);
+      }
+    }
+
+    function removePulpContainer(button) {
+      const container = document.getElementById("pulpContainer");
+      if (container.children.length > 1) {
+        button.parentElement.remove();
+        updateTotalPulpWeight();
+        localStorage.setItem('pulpContainer', container.innerHTML);
+      }
+    }
+
+    function updateProgress() {
+      progress.style.width = ((currentStep + 1) / steps.length) * 100 + "%";
+      localStorage.setItem('progress', progress.style.width);
+    }
+
+    function showStep(step) {
+      steps.forEach((s, i) => {
+        s.classList.toggle("active", i === step);
+      });
+      document.querySelector("button[type='submit']").style.display = step === steps.length - 1 ? "inline" : "none";
+      updateProgress();
+      localStorage.setItem('currentStep', step);
+    }
+
+    function validateStep(stepIndex) {
+      const inputs = steps[stepIndex].querySelectorAll("input[required], select[required]");
+      const error = document.getElementById("error" + stepIndex);
+      let valid = true;
+      inputs.forEach(input => {
+        if (!input.value) {
+          valid = false;
+        }
+      });
+      error.style.display = valid ? "none" : "block";
+      return valid;
+    }
+
+    function nextStep() {
+      if (!validateStep(currentStep)) return;
+      
+      // Store form data
+      const formData = {};
+      const inputs = document.querySelectorAll('input, select');
+      inputs.forEach(input => {
+        if (input.name) {
+          formData[input.name] = input.value;
+        }
+      });
+      localStorage.setItem('formData', JSON.stringify(formData));
+
+      timestamps[currentStep] = new Date().toLocaleString();
+      document.getElementById("timestamp" + currentStep).innerText = "Step completed at: " + timestamps[currentStep];
+      localStorage.setItem('timestamps', JSON.stringify(timestamps));
+
+      if (currentStep < steps.length - 1) {
+        currentStep++;
+        showStep(currentStep);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 0) {
+        currentStep--;
+        showStep(currentStep);
+      }
+    }
+
+    document.getElementById("trackerForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      if (!currentBatchNumber) {
+        alert('Please start a new batch first');
+        return;
+      }
+      
+      timestamps[currentStep] = new Date().toLocaleString();
+      document.getElementById("timestamp" + currentStep).innerText = "Step completed at: " + timestamps[currentStep];
+
+      const data = new FormData(this);
+      const csvRows = ["Batch Number,Step,Field,Value"];
+      
+      // Add batch information
+      csvRows.push(`${currentBatchNumber},Batch Info,Production Date,${document.getElementById('productionDate').value}`);
+      csvRows.push(`${currentBatchNumber},Batch Info,Supervisor,${document.getElementById('supervisorName').value}`);
+
+      // Raw Material Intake
+      const crateWeights = data.getAll('crate_weight[]');
+      const defectiveWeights = data.getAll('defective_weight[]');
+      let totalRawWeight = 0;
+      let totalDefectiveWeight = 0;
+
+      crateWeights.forEach((weight, index) => {
+        csvRows.push(`${currentBatchNumber},Raw Material,Crate ${index + 1} Weight,${weight}`);
+        csvRows.push(`${currentBatchNumber},Raw Material,Crate ${index + 1} Defective Weight,${defectiveWeights[index] || 0}`);
+        totalRawWeight += parseFloat(weight) || 0;
+        totalDefectiveWeight += parseFloat(defectiveWeights[index]) || 0;
+      });
+      csvRows.push(`${currentBatchNumber},Raw Material,Total Raw Weight,${totalRawWeight}`);
+      csvRows.push(`${currentBatchNumber},Raw Material,Total Defective Weight,${totalDefectiveWeight}`);
+
+      // Washing & Puree Processing
+      csvRows.push(`${currentBatchNumber},Washing,Removed Weight,${data.get('wash_weight')}`);
+      csvRows.push(`${currentBatchNumber},Puree,Method,${data.get('puree_method')}`);
+      csvRows.push(`${currentBatchNumber},Puree,Waste Weight,${data.get('blanch_weight')}`);
+
+      // Pulping
+      const pulpWeights = data.getAll('pulp_weight[]');
+      let totalPulpWeight = 0;
+      pulpWeights.forEach((weight, index) => {
+        csvRows.push(`${currentBatchNumber},Pulping,Container ${index + 1} Weight,${weight}`);
+        totalPulpWeight += parseFloat(weight) || 0;
+      });
+      csvRows.push(`${currentBatchNumber},Pulping,Total Pulp Weight,${totalPulpWeight}`);
+
+      // Cooking
+      csvRows.push(`${currentBatchNumber},Cooking,Input Puree,${data.get('input_puree')}`);
+      csvRows.push(`${currentBatchNumber},Cooking,Pre-Brix,${data.get('pre_brix')}`);
+      csvRows.push(`${currentBatchNumber},Cooking,Pre-pH,${data.get('pre_ph')}`);
+      csvRows.push(`${currentBatchNumber},Cooking,Reduction %,${data.get('reduction_percent')}`);
+      csvRows.push(`${currentBatchNumber},Cooking,Sugar Added,${data.get('sugar')}`);
+      csvRows.push(`${currentBatchNumber},Cooking,Adrak Added,${data.get('adrak')}`);
+      csvRows.push(`${currentBatchNumber},Cooking,Vinegar Added,${data.get('vinegar')}`);
+      csvRows.push(`${currentBatchNumber},Cooking,Spices Added,${data.get('spices')}`);
+      csvRows.push(`${currentBatchNumber},Cooking,Final Output,${data.get('final_output')}`);
+
+      // Quality Control
+      csvRows.push(`${currentBatchNumber},Quality,Final pH,${data.get('ph')}`);
+      csvRows.push(`${currentBatchNumber},Quality,Final Brix,${data.get('brix')}`);
+
+      // Bottling
+      const bottles200g = data.getAll('bottles_200g[]');
+      const bottles500g = data.getAll('bottles_500g[]');
+      const defectiveBottles = data.getAll('defective_bottles[]');
+      let total200g = 0;
+      let total500g = 0;
+      let totalDefective = 0;
+
+      bottles200g.forEach((count, index) => {
+        csvRows.push(`${currentBatchNumber},Bottling,Crate ${index + 1} 200g Bottles,${count}`);
+        csvRows.push(`${currentBatchNumber},Bottling,Crate ${index + 1} 500g Bottles,${bottles500g[index]}`);
+        csvRows.push(`${currentBatchNumber},Bottling,Crate ${index + 1} Defective Bottles,${defectiveBottles[index] || 0}`);
+        total200g += parseInt(count) || 0;
+        total500g += parseInt(bottles500g[index]) || 0;
+        totalDefective += parseInt(defectiveBottles[index]) || 0;
+      });
+
+      const totalPackedWeight = (total200g * 0.2 + total500g * 0.5);
+      const remainingKetchup = parseFloat(data.get('final_output')) - totalPackedWeight;
+
+      csvRows.push(`${currentBatchNumber},Bottling,Total 200g Bottles,${total200g}`);
+      csvRows.push(`${currentBatchNumber},Bottling,Total 500g Bottles,${total500g}`);
+      csvRows.push(`${currentBatchNumber},Bottling,Total Defective Bottles,${totalDefective}`);
+      csvRows.push(`${currentBatchNumber},Bottling,Total Packed Weight,${totalPackedWeight.toFixed(2)}`);
+      csvRows.push(`${currentBatchNumber},Bottling,Remaining Ketchup,${remainingKetchup.toFixed(2)}`);
+
+      // Timestamps
+      timestamps.forEach((ts, i) => {
+        csvRows.push(`${currentBatchNumber},Timestamps,Step ${i + 1},${ts}`);
+      });
+
+      const csvContent = csvRows.join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ketchup_production_log_${currentBatchNumber}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Show start batch button and enable inputs after submission
+      document.getElementById('startBatchBtn').style.display = 'block';
+      document.getElementById('batchNumber').disabled = false;
+      document.getElementById('productionDate').disabled = false;
+      document.getElementById('supervisorName').disabled = false;
+      
+      // Ask if user wants to start a new batch
+      if (confirm('Production log saved. Would you like to start a new batch?')) {
+        document.getElementById('batchNumber').value = '';
+        document.getElementById('productionDate').value = '';
+        document.getElementById('supervisorName').value = '';
+        currentBatchNumber = '';
+      }
+    });
+
+    updateProgress();
+  </script>
+</body>
+</html>
